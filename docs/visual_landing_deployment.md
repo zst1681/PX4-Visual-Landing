@@ -280,10 +280,19 @@ export PX4_DIR=$HOME/PX4_Firmware
 git clone --branch visual-landing --single-branch --depth 1 --filter=blob:none git@github.com:zst1681/PX4-Visual-Landing.git "$PX4_DIR"
 cd "$PX4_DIR"
 git submodule sync --recursive
-git submodule update --init --recursive --depth 1 --jobs 1
+git submodule update --init --recursive --depth 1 --jobs 1 \
+  Tools/sitl_gazebo \
+  src/modules/mavlink/mavlink \
+  src/drivers/gps/devices \
+  src/lib/events/libevents
 ```
 
-不要再用 `git clone --recursive git@github.com:zst1681/PX4-Visual-Landing.git ~/PX4_Firmware` 作为首选方式。PX4 历史和子模块都很大，一次性全量递归克隆容易出现 `远端意外挂断`、`过早的文件结束符 EOF`、`index-pack 失败`。上面的命令先浅克隆主仓库，再用单线程分步拉子模块，更适合网络不稳定的新设备。
+不要再用 `git clone --recursive git@github.com:zst1681/PX4-Visual-Landing.git ~/PX4_Firmware` 作为首选方式，也不要直接执行不带路径限制的 `git submodule update --init --recursive`。PX4 历史和子模块都很大，一次性全量递归克隆会拉取 jMAVSim、FlightGear、JSBSim、NuttX 等当前视觉降落流程不需要的内容，网络不稳定时容易出现 `远端意外挂断`、`过早的文件结束符 EOF`、`index-pack 失败`。上面的命令只拉 Gazebo 视觉降落必需的子模块：
+
+- `Tools/sitl_gazebo`：Gazebo 世界、模型和插件。
+- `src/modules/mavlink/mavlink`：PX4 MAVLink 生成和运行依赖。
+- `src/drivers/gps/devices`：SITL 默认 GPS 驱动依赖。
+- `src/lib/events/libevents`：PX4 events 生成依赖。
 
 ### 5.2 安装依赖并构建
 
@@ -368,14 +377,26 @@ scripts/cleanup_aruco_runtime.sh
 
 `git clone` 出现 `远端意外挂断`、`过早的文件结束符（EOF）`、`index-pack 失败`：不要使用全量递归克隆。先把失败留下的不完整目录挪走，再执行 5.1 中的浅克隆命令。仓库 URL 是 `git@github.com:zst1681/PX4-Visual-Landing.git`，本地目录是 `$HOME/PX4_Firmware`，注意 `PX4-Visual-Landing` 用短横线，`PX4_Firmware` 用下划线。
 
-子模块下载中断：进入 `$PX4_DIR` 后重复执行下面这条命令即可，它会从已有进度继续补齐：
+子模块下载中断：进入 `$PX4_DIR` 后重复执行下面这条命令即可，它会从已有进度继续补齐必需子模块：
 
 ```bash
-git submodule update --init --recursive --depth 1 --jobs 1
+git submodule update --init --recursive --depth 1 --jobs 1 \
+  Tools/sitl_gazebo \
+  src/modules/mavlink/mavlink \
+  src/drivers/gps/devices \
+  src/lib/events/libevents
+```
+
+`Tools/jMAVSim` 下载失败：当前 ArUco 精准降落使用 Gazebo，不需要 jMAVSim。不要继续重试全量子模块命令，改用上面的“必需子模块”命令即可。如果失败后留下了半截 jMAVSim 目录，可以清掉它：
+
+```bash
+cd "$PX4_DIR"
+git submodule deinit -f Tools/jMAVSim || true
+rm -rf Tools/jMAVSim .git/modules/Tools/jMAVSim
 ```
 
 如果提示 `--filter=blob:none` 不支持：说明新设备的 Git 版本太旧，先执行 `git --version` 检查；Ubuntu 20.04 默认 Git 通常可用。临时绕过时可以去掉 `--filter=blob:none`，但下载体积会变大。
 
-Gazebo 找不到模型或世界：确认 `Tools/sitl_gazebo` 子模块已经指向你个人 fork 的提交，并执行过 `git submodule update --init --recursive --depth 1 --jobs 1`。
+Gazebo 找不到模型或世界：确认 `Tools/sitl_gazebo` 子模块已经指向你个人 fork 的提交，并执行过 5.1 中的必需子模块更新命令。
 
 OFFBOARD/ARM 失败：确认 `/mavros/state` connected 为 `True`，当前 launch 里 MAVROS 已设置 `use_comp_id_system_control: true`，控制节点也会尝试设置 `COM_RCL_EXCEPT` 以允许无遥控 OFFBOARD。
