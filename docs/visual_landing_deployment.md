@@ -112,7 +112,7 @@ python3 -m pip install --user -r Tools/setup/requirements.txt
 外部工作空间新设备部署示例：
 
 ```bash
-git clone git@github.com:<你的用户名>/ros_gazebo_px4_sim_ws.git ~/ros_gazebo_px4_sim_ws-master
+git clone git@github.com:zst1681/ros_gazebo_px4_sim_ws.git ~/ros_gazebo_px4_sim_ws-master
 cd ~/ros_gazebo_px4_sim_ws-master
 rosdep install --from-paths src --ignore-src -r -y
 catkin build
@@ -128,6 +128,64 @@ catkin build
 ```
 
 ## 4. 个人 GitHub 上传流程
+
+下面按你的 GitHub 信息直接写：
+
+- GitHub 用户名：`zst1681`
+- Git 提交邮箱：`z2078543324@163.com`
+
+### 4.0 第一次使用 GitHub 的准备
+
+先在本机配置 Git 身份：
+
+```bash
+git config --global user.name "zst1681"
+git config --global user.email "z2078543324@163.com"
+git config --global init.defaultBranch main
+git config --global --list | grep -E "user.name|user.email|init.defaultBranch"
+```
+
+建议用 SSH 上传代码。先生成 SSH key：
+
+```bash
+ssh-keygen -t ed25519 -C "z2078543324@163.com"
+```
+
+一路回车即可。然后启动 ssh-agent 并加入私钥：
+
+```bash
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_ed25519
+cat ~/.ssh/id_ed25519.pub
+```
+
+复制 `cat` 输出的整行公钥，打开 GitHub 网页：
+
+1. 右上角头像 -> `Settings`
+2. 左侧 `SSH and GPG keys`
+3. `New SSH key`
+4. Title 可填 `ubuntu-px4`
+5. Key 粘贴刚才的 `id_ed25519.pub` 内容
+6. 点击 `Add SSH key`
+
+测试 SSH 是否成功：
+
+```bash
+ssh -T git@github.com
+```
+
+正常会看到类似 `Hi zst1681! You've successfully authenticated`。如果提示 `Permission denied (publickey)`，说明 SSH key 没有加到 GitHub，或 `ssh-add` 没成功。
+
+然后在 GitHub 网页新建仓库。建议先建这两个：
+
+- `PX4-Visual-Landing`
+- `PX4-SITL_gazebo-Visual-Landing`
+
+如果也要保存外部 ArUco ROS 工作空间，再建第三个：
+
+- `ros_gazebo_px4_sim_ws`
+
+新建仓库时不要勾选 `Add a README file`、`.gitignore`、`license`，保持空仓库，方便直接推送本地已有项目。
 
 建议至少维护两个仓库：
 
@@ -146,7 +204,7 @@ catkin build
 cd ~/PX4_Firmware/Tools/sitl_gazebo
 git checkout -b visual-landing-gazebo
 git remote rename origin upstream
-git remote add origin git@github.com:<你的用户名>/PX4-SITL_gazebo-Visual-Landing.git
+git remote add origin git@github.com:zst1681/PX4-SITL_gazebo-Visual-Landing.git
 git add models/aruco_marker models/aruco_marker_6x6_1000_31_plane models/aruco_nested_board models/iris_down_monocular_cam models/monocular_camera worlds/aruco_landing_demo.world worlds/aruco_search_demo.world worlds/aruco_single_marker_demo.world worlds/empty_aruco.world models/iris_fpv_cam/iris_fpv_cam.sdf
 git commit -m "Add ArUco landing Gazebo worlds and models"
 git push -u origin visual-landing-gazebo
@@ -154,11 +212,15 @@ git push -u origin visual-landing-gazebo
 
 如果还需要 `models/kinect_self`、`worlds/typhoon_h480.world` 或其他已修改模型，也在子模块里一并 `git add`。
 
+注意：`git push -u origin visual-landing-gazebo` 和 `cd ~/PX4_Firmware` 是两条命令，必须分两行执行。若 `git commit` 提示没有暂存内容，并且 `git log --oneline -1` 已经能看到 `Add ArUco landing Gazebo worlds and models`，说明这一步已经完成。
+
 ### 4.2 更新 PX4 主仓库的子模块地址
+
+这一节必须在主仓库 `~/PX4_Firmware` 下执行，不要在 `~/PX4_Firmware/Tools/sitl_gazebo` 子模块目录里执行。
 
 ```bash
 cd ~/PX4_Firmware
-git config -f .gitmodules submodule.Tools/sitl_gazebo.url git@github.com:<你的用户名>/PX4-SITL_gazebo-Visual-Landing.git
+git config -f .gitmodules submodule.Tools/sitl_gazebo.url git@github.com:zst1681/PX4-SITL_gazebo-Visual-Landing.git
 git config -f .gitmodules submodule.Tools/sitl_gazebo.branch visual-landing-gazebo
 git submodule sync Tools/sitl_gazebo
 git add .gitmodules Tools/sitl_gazebo
@@ -172,7 +234,7 @@ git add .gitmodules Tools/sitl_gazebo
 cd ~/PX4_Firmware
 git checkout -b visual-landing
 git remote rename origin upstream
-git remote add origin git@github.com:<你的用户名>/PX4-Visual-Landing.git
+git remote add origin git@github.com:zst1681/PX4-Visual-Landing.git
 git add .gitignore docs/visual_landing_deployment.md config launch scripts ROMFS/px4fmu_common/init.d-posix/rcS ROMFS/px4fmu_common/init.d-posix/px4-rc.mavlink .gitmodules Tools/sitl_gazebo
 git status
 git commit -m "Add ArUco visual landing SITL workflow"
@@ -193,7 +255,7 @@ git push -u origin visual-landing
 ```bash
 cd ~/ros_gazebo_px4_sim_ws-master
 git init
-git remote add origin git@github.com:<你的用户名>/ros_gazebo_px4_sim_ws.git
+git remote add origin git@github.com:zst1681/ros_gazebo_px4_sim_ws.git
 printf "/build/\n/devel/\n/.catkin_tools/\n*.pyc\n__pycache__/\n" > .gitignore
 git add README.md src .gitignore
 git commit -m "Add ArUco ROS workspace for PX4 landing demo"
@@ -205,7 +267,7 @@ git push -u origin main
 ### 5.1 克隆主仓库和子模块
 
 ```bash
-git clone --recursive git@github.com:<你的用户名>/PX4-Visual-Landing.git ~/PX4_Firmware
+git clone --recursive git@github.com:zst1681/PX4-Visual-Landing.git ~/PX4_Firmware
 cd ~/PX4_Firmware
 git checkout visual-landing
 git submodule update --init --recursive
@@ -223,7 +285,7 @@ DONT_RUN=1 make px4_sitl_default gazebo
 如果你有外部 ArUco 工作空间：
 
 ```bash
-git clone git@github.com:<你的用户名>/ros_gazebo_px4_sim_ws.git ~/ros_gazebo_px4_sim_ws-master
+git clone git@github.com:zst1681/ros_gazebo_px4_sim_ws.git ~/ros_gazebo_px4_sim_ws-master
 cd ~/ros_gazebo_px4_sim_ws-master
 rosdep install --from-paths src --ignore-src -r -y
 catkin build
