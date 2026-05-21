@@ -42,10 +42,10 @@ PX4 依赖由仓库自带脚本安装。只做仿真可跳过 NuttX 交叉编译
 ```bash
 export PX4_DIR=$HOME/PX4_Firmware
 cd "$PX4_DIR"
-bash Tools/setup/ubuntu.sh --no-nuttx
+bash Tools/setup/ubuntu.sh --no-nuttx --no-python
 ```
 
-如果后续还要烧录真实飞控固件，去掉 `--no-nuttx`。
+`--no-python` 表示这里先只装 apt 依赖，Python 依赖按下文单独安装，便于处理 pip 缓存和版本兼容问题。如果后续还要烧录真实飞控固件，去掉 `--no-nuttx`。
 
 ROS 和 MAVROS 依赖：
 
@@ -99,9 +99,12 @@ Python 依赖：
 ```bash
 export PX4_DIR=$HOME/PX4_Firmware
 cd "$PX4_DIR"
-python3 -m pip cache purge || true
-python3 -m pip install --user --upgrade pip setuptools wheel
-python3 -m pip install --user --no-cache-dir -r Tools/setup/requirements.txt
+rm -rf "$HOME/.cache/pip"
+sed -E 's/matplotlib>=3\.0\.\*/matplotlib>=3.0/' \
+  Tools/setup/requirements.txt > /tmp/px4_requirements_visual_landing.txt
+python3 -m pip install --user --no-cache-dir \
+  -r /tmp/px4_requirements_visual_landing.txt
+rm -f /tmp/px4_requirements_visual_landing.txt
 python3 - <<'PY'
 import kconfiglib
 import menuconfig
@@ -109,12 +112,18 @@ print("PX4 Python deps ok")
 PY
 ```
 
-如果 `pip` 报 `THESE PACKAGES DO NOT MATCH THE HASHES`，通常不是 `requirements.txt` 写错，而是 wheel 下载中断或 pip 缓存里有损坏文件。先执行上面的 `pip cache purge` 和 `--no-cache-dir` 版本；网络仍不稳定时可临时换镜像：
+不要把 Ubuntu 20.04 自带的 pip 直接升级到 pip 25 后再安装原始 `Tools/setup/requirements.txt`。旧 PX4 依赖里有 `matplotlib>=3.0.*`，pip 25 会把它判为非法写法；上面的 `sed` 命令会临时修正为 `matplotlib>=3.0`，不会修改仓库文件。
+
+如果 `pip` 报 `THESE PACKAGES DO NOT MATCH THE HASHES`，通常不是 `requirements.txt` 写错，而是 wheel 下载中断、代理异常或 pip 缓存里有损坏文件。先执行上面的 `rm -rf "$HOME/.cache/pip"` 和 `--no-cache-dir` 版本；网络仍不稳定时可临时换镜像：
 
 ```bash
+rm -rf "$HOME/.cache/pip"
+sed -E 's/matplotlib>=3\.0\.\*/matplotlib>=3.0/' \
+  Tools/setup/requirements.txt > /tmp/px4_requirements_visual_landing.txt
 python3 -m pip install --user --no-cache-dir \
   -i https://pypi.tuna.tsinghua.edu.cn/simple \
-  -r Tools/setup/requirements.txt
+  -r /tmp/px4_requirements_visual_landing.txt
+rm -f /tmp/px4_requirements_visual_landing.txt
 ```
 
 ## 3. 外部 catkin 工作空间
@@ -303,6 +312,8 @@ export PX4_DIR=$HOME/PX4_Firmware
 # mv "$PX4_DIR" "${PX4_DIR}.failed.$(date +%Y%m%d%H%M%S)"
 git clone --branch visual-landing --single-branch --depth 1 --filter=blob:none https://github.com/zst1681/PX4-Visual-Landing.git "$PX4_DIR"
 cd "$PX4_DIR"
+git fetch --tags --force
+git describe --tags --always
 git submodule sync --recursive
 git submodule update --init --recursive --depth 1 --jobs 1 \
   Tools/sitl_gazebo \
@@ -325,17 +336,22 @@ git submodule update --init --recursive --depth 1 --jobs 1 \
 export HOME="$(getent passwd "$(id -un)" | cut -d: -f6)"
 export PX4_DIR="$HOME/PX4_Firmware"
 cd "$PX4_DIR"
-bash Tools/setup/ubuntu.sh --no-nuttx
-python3 -m pip cache purge || true
-python3 -m pip install --user --upgrade pip setuptools wheel
-python3 -m pip install --user --no-cache-dir -r Tools/setup/requirements.txt
+bash Tools/setup/ubuntu.sh --no-nuttx --no-python
+rm -rf "$HOME/.cache/pip"
+sed -E 's/matplotlib>=3\.0\.\*/matplotlib>=3.0/' \
+  Tools/setup/requirements.txt > /tmp/px4_requirements_visual_landing.txt
+python3 -m pip install --user --no-cache-dir \
+  -r /tmp/px4_requirements_visual_landing.txt
+rm -f /tmp/px4_requirements_visual_landing.txt
 python3 - <<'PY'
 import kconfiglib
 import menuconfig
 print("PX4 Python deps ok")
 PY
-DONT_RUN=1 make px4_sitl_default gazebo
+GIT_SUBMODULES_ARE_EVIL=1 DONT_RUN=1 make px4_sitl_default gazebo
 ```
+
+`--no-python` 会让 `ubuntu.sh` 只安装 apt 依赖，Python 依赖由后面的命令单独安装。这样可以避开网络不稳定时 `ubuntu.sh` 中途退出，也可以兼容 pip 20 和 pip 25。
 
 如果你有外部 ArUco 工作空间：
 
@@ -487,19 +503,33 @@ scripts/cleanup_aruco_runtime.sh
 
 `cv2.aruco` 不存在：安装 `libopencv-contrib-dev` 和 `python3-opencv`，并确认没有被 pip 里不带 contrib 的 `opencv-python` 覆盖。
 
-`pip install -r Tools/setup/requirements.txt` 报 `THESE PACKAGES DO NOT MATCH THE HASHES`：清掉损坏缓存并关闭缓存重装：
+`pip install -r Tools/setup/requirements.txt` 报 `THESE PACKAGES DO NOT MATCH THE HASHES`：清掉损坏缓存并关闭缓存重装。Ubuntu 20.04 自带 pip 20 没有 `pip cache purge`，直接删缓存目录即可：
 
 ```bash
-python3 -m pip cache purge || true
-python3 -m pip install --user --no-cache-dir -r Tools/setup/requirements.txt
+rm -rf "$HOME/.cache/pip"
+sed -E 's/matplotlib>=3\.0\.\*/matplotlib>=3.0/' \
+  Tools/setup/requirements.txt > /tmp/px4_requirements_visual_landing.txt
+python3 -m pip install --user --no-cache-dir \
+  -r /tmp/px4_requirements_visual_landing.txt
+rm -f /tmp/px4_requirements_visual_landing.txt
 ```
 
 如果仍然失败，换一个稳定镜像再执行：
 
 ```bash
+rm -rf "$HOME/.cache/pip"
+sed -E 's/matplotlib>=3\.0\.\*/matplotlib>=3.0/' \
+  Tools/setup/requirements.txt > /tmp/px4_requirements_visual_landing.txt
 python3 -m pip install --user --no-cache-dir \
   -i https://pypi.tuna.tsinghua.edu.cn/simple \
-  -r Tools/setup/requirements.txt
+  -r /tmp/px4_requirements_visual_landing.txt
+rm -f /tmp/px4_requirements_visual_landing.txt
+```
+
+`pip` 升级到 25 后报 `Invalid requirement: 'matplotlib>=3.0.*'`：不要直接安装原始 `Tools/setup/requirements.txt`，用上面的 `sed` 临时 requirements 文件。也可以临时降回旧 pip：
+
+```bash
+python3 -m pip install --user 'pip<24.1'
 ```
 
 `make px4_sitl_default gazebo` 报 `No module named 'menuconfig'` 或 `kconfiglib is not installed`：说明 Python 依赖没有装成功，至少需要先确认下面两项能导入：
@@ -521,7 +551,22 @@ export PX4_DIR="$HOME/PX4_Firmware"
 cd "$PX4_DIR"
 ```
 
-`rospack find px4` 失败：先完成 `DONT_RUN=1 make px4_sitl_default gazebo`，再 `source scripts/setup_aruco_runtime.bash`，确认脚本没有报 `/opt/ros/noetic/setup.bash` 或 `$PX4_DIR/Tools/setup_gazebo.bash` 缺失。
+`make px4_sitl_default gazebo` 仍尝试克隆 `Tools/jMAVSim`、`Tools/jsbsim_bridge` 或 `Tools/simulation-ignition`：这些不是当前 Gazebo ArUco 精准降落流程必需子模块。构建时使用下面这条命令，跳过 PX4 对非必需子模块的交互式检查：
+
+```bash
+GIT_SUBMODULES_ARE_EVIL=1 DONT_RUN=1 make px4_sitl_default gazebo
+```
+
+`make` 报 `Error: the git tag 'xxxxxxx' does not match the expected format`：浅克隆没有拿到 PX4 原始版本 tag，先拉 tag；如果仍显示纯短哈希，就给当前视觉降落提交打一个本地合法 tag：
+
+```bash
+git fetch --tags --force
+git describe --tags --always
+git tag -f v1.13.2-1.0.0
+GIT_SUBMODULES_ARE_EVIL=1 DONT_RUN=1 make px4_sitl_default gazebo
+```
+
+`rospack find px4` 失败：先完成 `GIT_SUBMODULES_ARE_EVIL=1 DONT_RUN=1 make px4_sitl_default gazebo`，再 `source scripts/setup_aruco_runtime.bash`，确认脚本没有报 `/opt/ros/noetic/setup.bash` 或 `$PX4_DIR/Tools/setup_gazebo.bash` 缺失。
 
 `/aruco/pose` 没有发布：先确认相机图像存在。当前 `iris_down_monocular_cam` 默认话题是 `/camera/image_raw`，检测调试图是 `/aruco_det_image`。如果 `rostopic list | grep image_raw` 查到的图像话题不同，用 `sub_image_topic:=实际话题` 覆盖启动参数。
 
