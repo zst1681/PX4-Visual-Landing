@@ -4,7 +4,9 @@
 
 ## 1. 当前项目组成
 
-核心仓库是 `PX4_Firmware`，在原 PX4 基础上增加了以下视觉降落相关内容：
+核心仓库是 `PX4-Visual-Landing`，在原 PX4 基础上增加了以下视觉降落相关内容。
+
+注意：GitHub 仓库根目录就是本机 `PX4_Firmware` 目录里的所有子文件和子目录，不会再包含一层 `PX4_Firmware/` 文件夹。本文后续用 `PX4_DIR` 表示“本机 PX4 仓库根目录”；新设备推荐克隆到 `$HOME/PX4-Visual-Landing`，当前机器如果仍使用旧目录名，也可以把 `PX4_DIR` 设为 `$HOME/PX4_Firmware`。
 
 - `launch/aruco_search_and_land_demo.launch`：一键启动 Gazebo、PX4 SITL、MAVROS、ArUco 检测和搜索降落控制。
 - `launch/aruco_detect_and_search.launch`：启动检测节点和降落控制节点。
@@ -36,7 +38,8 @@ sudo apt install -y git curl wget gnupg lsb-release build-essential cmake ninja-
 PX4 依赖由仓库自带脚本安装。只做仿真可跳过 NuttX 交叉编译工具链：
 
 ```bash
-cd ~/PX4_Firmware
+export PX4_DIR=$HOME/PX4-Visual-Landing
+cd "$PX4_DIR"
 bash Tools/setup/ubuntu.sh --no-nuttx
 ```
 
@@ -92,7 +95,8 @@ python3 -c "import cv2; print(cv2.__version__); print(hasattr(cv2, 'aruco'))"
 Python 依赖：
 
 ```bash
-cd ~/PX4_Firmware
+export PX4_DIR=$HOME/PX4-Visual-Landing
+cd "$PX4_DIR"
 python3 -m pip install --user -r Tools/setup/requirements.txt
 ```
 
@@ -100,7 +104,7 @@ python3 -m pip install --user -r Tools/setup/requirements.txt
 
 当前 `scripts/setup_aruco_runtime.bash` 支持以下环境变量：
 
-- `PX4_DIR`：PX4 仓库路径，默认是脚本所在仓库。
+- `PX4_DIR`：本机 PX4 仓库根目录，默认是脚本所在仓库；这只是本机路径名，不代表 GitHub 仓库里有 `PX4_Firmware/` 这一层目录。
 - `ARUCO_WS`：外部 ArUco 工作空间，默认 `$HOME/ros_gazebo_px4_sim_ws-master`。
 - `GAZEBO_WS` 或 `CATKIN_WS`：可选 Gazebo overlay 工作空间，默认 `$HOME/catkin_ws`。
 - `XTDRONE_MODELS`：可选 XTDrone 模型目录，默认 `$HOME/XTDrone/sitl_config/models`。
@@ -189,7 +193,7 @@ ssh -T git@github.com
 
 建议至少维护两个仓库：
 
-- `PX4-Visual-Landing`：当前 `PX4_Firmware` 仓库。
+- `PX4-Visual-Landing`：当前 PX4 项目仓库，仓库根目录直接是 PX4 文件树。
 - `PX4-SITL_gazebo-Visual-Landing`：`Tools/sitl_gazebo` 子模块 fork，因为 ArUco 世界和模型在子模块内。
 
 可选第三个仓库：
@@ -201,7 +205,9 @@ ssh -T git@github.com
 先在 GitHub 创建 `PX4-SITL_gazebo-Visual-Landing`。然后：
 
 ```bash
-cd ~/PX4_Firmware/Tools/sitl_gazebo
+cd /path/to/your/local-px4-repo
+export PX4_DIR=$(pwd)
+cd Tools/sitl_gazebo
 git checkout -b visual-landing-gazebo
 git remote rename origin upstream
 git remote add origin git@github.com:zst1681/PX4-SITL_gazebo-Visual-Landing.git
@@ -212,14 +218,14 @@ git push -u origin visual-landing-gazebo
 
 如果还需要 `models/kinect_self`、`worlds/typhoon_h480.world` 或其他已修改模型，也在子模块里一并 `git add`。
 
-注意：`git push -u origin visual-landing-gazebo` 和 `cd ~/PX4_Firmware` 是两条命令，必须分两行执行。若 `git commit` 提示没有暂存内容，并且 `git log --oneline -1` 已经能看到 `Add ArUco landing Gazebo worlds and models`，说明这一步已经完成。
+注意：`git push -u origin visual-landing-gazebo` 和 `cd "$PX4_DIR"` 是两条命令，必须分两行执行。若 `git commit` 提示没有暂存内容，并且 `git log --oneline -1` 已经能看到 `Add ArUco landing Gazebo worlds and models`，说明这一步已经完成。
 
 ### 4.2 更新 PX4 主仓库的子模块地址
 
-这一节必须在主仓库 `~/PX4_Firmware` 下执行，不要在 `~/PX4_Firmware/Tools/sitl_gazebo` 子模块目录里执行。
+这一节必须在主仓库根目录 `$PX4_DIR` 下执行，不要在 `$PX4_DIR/Tools/sitl_gazebo` 子模块目录里执行。
 
 ```bash
-cd ~/PX4_Firmware
+cd "$PX4_DIR"
 git config -f .gitmodules submodule.Tools/sitl_gazebo.url git@github.com:zst1681/PX4-SITL_gazebo-Visual-Landing.git
 git config -f .gitmodules submodule.Tools/sitl_gazebo.branch visual-landing-gazebo
 git submodule sync Tools/sitl_gazebo
@@ -231,7 +237,8 @@ git add .gitmodules Tools/sitl_gazebo
 在 GitHub 创建 `PX4-Visual-Landing`。然后：
 
 ```bash
-cd ~/PX4_Firmware
+cd /path/to/your/local-px4-repo
+export PX4_DIR=$(pwd)
 git checkout -b visual-landing
 git remote rename origin upstream
 git remote add origin git@github.com:zst1681/PX4-Visual-Landing.git
@@ -267,8 +274,9 @@ git push -u origin main
 ### 5.1 克隆主仓库和子模块
 
 ```bash
-git clone --recursive git@github.com:zst1681/PX4-Visual-Landing.git ~/PX4_Firmware
-cd ~/PX4_Firmware
+export PX4_DIR=$HOME/PX4-Visual-Landing
+git clone --recursive git@github.com:zst1681/PX4-Visual-Landing.git "$PX4_DIR"
+cd "$PX4_DIR"
 git checkout visual-landing
 git submodule update --init --recursive
 ```
@@ -276,7 +284,8 @@ git submodule update --init --recursive
 ### 5.2 安装依赖并构建
 
 ```bash
-cd ~/PX4_Firmware
+export PX4_DIR=$HOME/PX4-Visual-Landing
+cd "$PX4_DIR"
 bash Tools/setup/ubuntu.sh --no-nuttx
 python3 -m pip install --user -r Tools/setup/requirements.txt
 DONT_RUN=1 make px4_sitl_default gazebo
@@ -294,7 +303,8 @@ catkin build
 ### 5.3 启动视觉降落
 
 ```bash
-cd ~/PX4_Firmware
+export PX4_DIR=$HOME/PX4-Visual-Landing
+cd "$PX4_DIR"
 source scripts/setup_aruco_runtime.bash
 roslaunch px4 aruco_search_and_land_demo.launch gui:=false
 ```
@@ -302,6 +312,7 @@ roslaunch px4 aruco_search_and_land_demo.launch gui:=false
 如果你的外部工作空间路径不是默认值：
 
 ```bash
+cd "$PX4_DIR"
 export ARUCO_WS=$HOME/workspaces/ros_gazebo_px4_sim_ws
 export GAZEBO_WS=$HOME/catkin_ws
 source scripts/setup_aruco_runtime.bash
@@ -313,7 +324,7 @@ roslaunch px4 aruco_search_and_land_demo.launch gui:=false
 确认 ROS 能找到包：
 
 ```bash
-source ~/PX4_Firmware/scripts/setup_aruco_runtime.bash
+source "$PX4_DIR/scripts/setup_aruco_runtime.bash"
 rospack find px4
 rospack find mavros
 ```
@@ -334,7 +345,7 @@ rostopic hz /aruco/pose -w 5
 跑一次 benchmark：
 
 ```bash
-cd ~/PX4_Firmware
+cd "$PX4_DIR"
 source scripts/setup_aruco_runtime.bash
 python3 scripts/benchmark_aruco_landing.py --runs 1 --timeout 140
 ```
