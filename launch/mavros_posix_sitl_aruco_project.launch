@@ -1,33 +1,28 @@
 <?xml version="1.0"?>
 <launch>
-    <!-- MAVROS posix SITL environment launch script -->
-    <!-- launches MAVROS, PX4 SITL, Gazebo environment, and spawns vehicle -->
-    <!-- vehicle pose -->
+    <!-- PX4 SITL + Gazebo + MAVROS using the upstream project world/model -->
     <arg name="x" default="0"/>
     <arg name="y" default="0"/>
     <arg name="z" default="0"/>
     <arg name="R" default="0"/>
     <arg name="P" default="0"/>
     <arg name="Y" default="0"/>
-    <!-- vehicle model and world -->
+
     <arg name="est" default="ekf2"/>
     <arg name="vehicle" default="iris"/>
-    <arg name="world" default="$(find mavlink_sitl_gazebo)/worlds/empty.world"/>
-    <arg name="vehicle_sdf" default="iris"/>
-    <arg name="sdf" default="$(find mavlink_sitl_gazebo)/models/$(arg vehicle_sdf)/$(arg vehicle_sdf).sdf"/>
+    <arg name="world" default="$(find mavlink_sitl_gazebo)/worlds/aruco_landing_demo.world"/>
+    <arg name="sdf" default="$(find mavlink_sitl_gazebo)/models/iris_down_monocular_cam/iris_down_monocular_cam.sdf"/>
 
-    <!-- gazebo configs -->
-    <arg name="gui" default="true"/>
+    <arg name="gui" default="false"/>
     <arg name="debug" default="false"/>
     <arg name="verbose" default="true"/>
     <arg name="paused" default="false"/>
     <arg name="respawn_gazebo" default="false"/>
-    <!-- MAVROS configs -->
+
     <arg name="fcu_url" default="udp://:24540@localhost:34580"/>
     <arg name="respawn_mavros" default="false"/>
-    <!-- PX4 configs -->
-    <arg name="interactive" default="true"/>
-    <!-- PX4 SITL and Gazebo -->
+    <arg name="interactive" default="false"/>
+
     <include file="$(find px4)/launch/posix_sitl.launch">
         <arg name="x" value="$(arg x)"/>
         <arg name="y" value="$(arg y)"/>
@@ -45,11 +40,19 @@
         <arg name="paused" value="$(arg paused)"/>
         <arg name="respawn_gazebo" value="$(arg respawn_gazebo)"/>
     </include>
-    <!-- MAVROS -->
-    <include file="$(find mavros)/launch/px4.launch">
-        <!-- GCS link is provided by SITL -->
-        <arg name="gcs_url" value=""/>
-        <arg name="fcu_url" value="$(arg fcu_url)"/>
-        <arg name="respawn_mavros" value="$(arg respawn_mavros)"/>
-    </include>
+
+    <node pkg="mavros" type="mavros_node" name="mavros" required="true" clear_params="true" output="screen" respawn="$(arg respawn_mavros)">
+        <param name="fcu_url" value="$(arg fcu_url)"/>
+        <param name="gcs_url" value=""/>
+        <param name="target_system_id" value="1"/>
+        <param name="target_component_id" value="1"/>
+        <param name="fcu_protocol" value="v2.0"/>
+
+        <rosparam command="load" file="$(find mavros)/launch/px4_pluginlists.yaml"/>
+        <rosparam command="load" file="$(find mavros)/launch/px4_config.yaml"/>
+        <rosparam>
+            cmd:
+              use_comp_id_system_control: true
+        </rosparam>
+    </node>
 </launch>

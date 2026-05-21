@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="sub_image_topic" default="/iris/camera/image_raw"/>
+    <arg name="camera_param_path" default="$(find px4)/config/camera_monocular_1280x720.yaml"/>
+    <arg name="marker_config_path" default="$(find px4)/config/aruco_nested_board.yaml"/>
+    <arg name="dictionary_id" default="11"/>
+    <arg name="aruco_id" default="31"/>
+    <arg name="aruco_length" default="0.2"/>
+    <arg name="auto_arm_offboard" default="true"/>
+
+    <node name="aruco_det" pkg="px4" type="aruco_multi_marker_det.py" output="screen">
+        <param name="dictionary_id" value="$(arg dictionary_id)"/>
+        <param name="aruco_id" value="$(arg aruco_id)"/>
+        <param name="aruco_length" value="$(arg aruco_length)"/>
+        <param name="camera_param_path" value="$(arg camera_param_path)"/>
+        <param name="sub_image_topic" value="$(arg sub_image_topic)"/>
+        <rosparam command="load" file="$(arg marker_config_path)"/>
+    </node>
+
+    <node name="aruco_land_demo" pkg="maxi_aruco_det_pkg" type="aruco_land_demo" output="screen">
+        <param name="auto_arm_offboard" value="$(arg auto_arm_offboard)"/>
+    </node>
+</launch>

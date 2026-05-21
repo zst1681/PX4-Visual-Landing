@@ -1,0 +1,75 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="sub_image_topic" default="/iris/camera/image_raw"/>
+    <arg name="camera_param_path" default="$(find px4)/config/camera_monocular_1280x720.yaml"/>
+    <arg name="marker_config_path" default="$(find px4)/config/aruco_nested_board_weighted.yaml"/>
+    <arg name="dictionary_id" default="11"/>
+    <arg name="aruco_id" default="31"/>
+    <arg name="aruco_length" default="0.2"/>
+    <arg name="auto_arm_offboard" default="true"/>
+    <arg name="land_after_detect" default="false"/>
+    <arg name="takeoff_altitude" default="1.8"/>
+    <arg name="search_spacing" default="1.0"/>
+    <arg name="search_radius" default="3.0"/>
+    <arg name="land_descent_rate" default="0.15"/>
+    <arg name="landing_commit_altitude" default="0.45"/>
+    <arg name="auto_land_settle_time" default="1.0"/>
+    <arg name="marker_estimate_window" default="0.8"/>
+    <arg name="marker_estimate_alpha" default="0.65"/>
+
+    <arg name="track_pid_kp" default="0.72"/>
+    <arg name="track_pid_ki" default="0.0"/>
+    <arg name="track_pid_kd" default="0.18"/>
+    <arg name="land_pid_kp" default="0.58"/>
+    <arg name="land_pid_ki" default="0.02"/>
+    <arg name="land_pid_kd" default="0.16"/>
+    <arg name="land_z_pid_kp" default="1.05"/>
+    <arg name="land_z_pid_ki" default="0.06"/>
+    <arg name="land_z_pid_kd" default="0.18"/>
+
+    <arg name="center_role_weight" default="1.0"/>
+    <arg name="corner_role_weight" default="1.0"/>
+    <arg name="corner_cluster_bonus" default="1.6"/>
+    <arg name="center_max_corner_ratio" default="0.55"/>
+    <arg name="fusion_outlier_scale" default="0.10"/>
+    <arg name="fusion_consistency_scale" default="0.08"/>
+    <arg name="single_corner_penalty" default="0.45"/>
+
+    <node name="aruco_det" pkg="px4" type="aruco_multi_marker_det_weighted.py" output="screen">
+        <param name="dictionary_id" value="$(arg dictionary_id)"/>
+        <param name="aruco_id" value="$(arg aruco_id)"/>
+        <param name="aruco_length" value="$(arg aruco_length)"/>
+        <param name="camera_param_path" value="$(arg camera_param_path)"/>
+        <param name="sub_image_topic" value="$(arg sub_image_topic)"/>
+        <param name="center_role_weight" value="$(arg center_role_weight)"/>
+        <param name="corner_role_weight" value="$(arg corner_role_weight)"/>
+        <param name="corner_cluster_bonus" value="$(arg corner_cluster_bonus)"/>
+        <param name="center_max_corner_ratio" value="$(arg center_max_corner_ratio)"/>
+        <param name="fusion_outlier_scale" value="$(arg fusion_outlier_scale)"/>
+        <param name="fusion_consistency_scale" value="$(arg fusion_consistency_scale)"/>
+        <param name="single_corner_penalty" value="$(arg single_corner_penalty)"/>
+        <rosparam command="load" file="$(arg marker_config_path)"/>
+    </node>
+
+    <node name="aruco_search_and_detect" pkg="px4" type="aruco_search_and_detect.py" output="screen">
+        <param name="auto_arm_offboard" value="$(arg auto_arm_offboard)"/>
+        <param name="land_after_detect" value="$(arg land_after_detect)"/>
+        <param name="takeoff_altitude" value="$(arg takeoff_altitude)"/>
+        <param name="search_spacing" value="$(arg search_spacing)"/>
+        <param name="search_radius" value="$(arg search_radius)"/>
+        <param name="land_descent_rate" value="$(arg land_descent_rate)"/>
+        <param name="landing_commit_altitude" value="$(arg landing_commit_altitude)"/>
+        <param name="auto_land_settle_time" value="$(arg auto_land_settle_time)"/>
+        <param name="marker_estimate_window" value="$(arg marker_estimate_window)"/>
+        <param name="marker_estimate_alpha" value="$(arg marker_estimate_alpha)"/>
+        <param name="track_pid_kp" value="$(arg track_pid_kp)"/>
+        <param name="track_pid_ki" value="$(arg track_pid_ki)"/>
+        <param name="track_pid_kd" value="$(arg track_pid_kd)"/>
+        <param name="land_pid_kp" value="$(arg land_pid_kp)"/>
+        <param name="land_pid_ki" value="$(arg land_pid_ki)"/>
+        <param name="land_pid_kd" value="$(arg land_pid_kd)"/>
+        <param name="land_z_pid_kp" value="$(arg land_z_pid_kp)"/>
+        <param name="land_z_pid_ki" value="$(arg land_z_pid_ki)"/>
+        <param name="land_z_pid_kd" value="$(arg land_z_pid_kd)"/>
+    </node>
+</launch>

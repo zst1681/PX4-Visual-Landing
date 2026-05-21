@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="frame_id" default="map"/>
+    <arg name="max_poses" default="2500"/>
+    <arg name="sample_stride" default="2"/>
+
+    <node name="uav_realtime_path" pkg="px4" type="realtime_pose_path.py" output="screen">
+        <param name="input_topic" value="/mavros/local_position/pose"/>
+        <param name="output_topic" value="/trajectory/uav_path"/>
+        <param name="frame_id" value="$(arg frame_id)"/>
+        <param name="max_poses" value="$(arg max_poses)"/>
+        <param name="sample_stride" value="$(arg sample_stride)"/>
+    </node>
+
+    <node name="setpoint_realtime_path" pkg="px4" type="realtime_pose_path.py" output="screen">
+        <param name="input_topic" value="/mavros/setpoint_position/local"/>
+        <param name="output_topic" value="/trajectory/setpoint_path"/>
+        <param name="frame_id" value="$(arg frame_id)"/>
+        <param name="max_poses" value="$(arg max_poses)"/>
+        <param name="sample_stride" value="$(arg sample_stride)"/>
+    </node>
+</launch>

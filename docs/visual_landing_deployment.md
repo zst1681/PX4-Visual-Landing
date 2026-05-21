@@ -1,0 +1,294 @@
+# 视觉精准降落项目环境与部署流程
+
+本文档按当前仓库实现整理，目标是把项目推到个人 GitHub 后，可以在一台新的 Ubuntu 设备上快速复现 PX4 SITL + Gazebo + MAVROS + ArUco 视觉降落流程。
+
+## 1. 当前项目组成
+
+核心仓库是 `PX4_Firmware`，在原 PX4 基础上增加了以下视觉降落相关内容：
+
+- `launch/aruco_search_and_land_demo.launch`：一键启动 Gazebo、PX4 SITL、MAVROS、ArUco 检测和搜索降落控制。
+- `launch/aruco_detect_and_search.launch`：启动检测节点和降落控制节点。
+- `launch/mavros_posix_sitl_aruco_project.launch`：启动 PX4 SITL、Gazebo 和 MAVROS。
+- `scripts/aruco_multi_marker_det.py`：基于 OpenCV ArUco 的多 marker 检测节点，输出 `/aruco/pose`。
+- `scripts/aruco_search_and_detect.py`：搜索、对准、下降、切换 AUTO.LAND 的主控制节点。
+- `scripts/benchmark_aruco_landing.py`、`scripts/benchmark_pid_groups.py`：批量测试和指标统计。
+- `config/*.yaml`、`config/*.json`：相机内参、marker 布局、PID 参数组。
+- `Tools/sitl_gazebo` 子模块：包含本项目新增/修改的 ArUco 世界和模型，必须作为子模块单独提交到你自己的 Gazebo fork。
+
+当前项目推荐基线：
+
+- Ubuntu 20.04
+- ROS Noetic
+- Gazebo 11
+- Python 3
+- OpenCV 4.2，且 Python 里必须有 `cv2.aruco`
+- PX4 SITL 目标：`px4_sitl_default`
+
+## 2. 必需依赖
+
+系统和编译工具：
+
+```bash
+sudo apt update
+sudo apt install -y git curl wget gnupg lsb-release build-essential cmake ninja-build python3 python3-dev python3-pip python3-setuptools python3-wheel
+```
+
+PX4 依赖由仓库自带脚本安装。只做仿真可跳过 NuttX 交叉编译工具链：
+
+```bash
+cd ~/PX4_Firmware
+bash Tools/setup/ubuntu.sh --no-nuttx
+```
+
+如果后续还要烧录真实飞控固件，去掉 `--no-nuttx`。
+
+ROS 和 MAVROS 依赖：
+
+如果是全新 Ubuntu 20.04，先添加 ROS Noetic 软件源：
+
+```bash
+sudo mkdir -p /etc/apt/keyrings
+curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | sudo gpg --dearmor -o /etc/apt/keyrings/ros-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | sudo tee /etc/apt/sources.list.d/ros1.list
+sudo apt update
+```
+
+安装 ROS、MAVROS、Gazebo/ROS 桥接和消息包：
+
+```bash
+sudo apt install -y \
+  ros-noetic-desktop-full \
+  ros-noetic-mavros ros-noetic-mavros-extras \
+  ros-noetic-gazebo-ros-pkgs ros-noetic-gazebo-ros-control \
+  ros-noetic-cv-bridge ros-noetic-image-transport \
+  ros-noetic-tf ros-noetic-tf2-ros ros-noetic-dynamic-reconfigure \
+  ros-noetic-geometry-msgs ros-noetic-sensor-msgs ros-noetic-nav-msgs \
+  ros-noetic-std-msgs ros-noetic-visualization-msgs \
+  python3-rosdep python3-catkin-tools python3-vcstool
+```
+
+初始化 `rosdep`，如果提示已经初始化，可以忽略该提示：
+
+```bash
+sudo rosdep init
+rosdep update
+```
+
+MAVROS 地理数据：
+
+```bash
+sudo /opt/ros/noetic/lib/mavros/install_geographiclib_datasets.sh
+```
+
+OpenCV/ArUco：
+
+```bash
+sudo apt install -y python3-opencv libopencv-dev libopencv-contrib-dev
+python3 -c "import cv2; print(cv2.__version__); print(hasattr(cv2, 'aruco'))"
+```
+
+上面最后一行应输出 `True`。如果不是，说明当前 Python OpenCV 没有 contrib/aruco 模块，需要重新安装带 contrib 的 OpenCV。
+
+Python 依赖：
+
+```bash
+cd ~/PX4_Firmware
+python3 -m pip install --user -r Tools/setup/requirements.txt
+```
+
+## 3. 外部 catkin 工作空间
+
+当前 `scripts/setup_aruco_runtime.bash` 支持以下环境变量：
+
+- `PX4_DIR`：PX4 仓库路径，默认是脚本所在仓库。
+- `ARUCO_WS`：外部 ArUco 工作空间，默认 `$HOME/ros_gazebo_px4_sim_ws-master`。
+- `GAZEBO_WS` 或 `CATKIN_WS`：可选 Gazebo overlay 工作空间，默认 `$HOME/catkin_ws`。
+- `XTDRONE_MODELS`：可选 XTDrone 模型目录，默认 `$HOME/XTDrone/sitl_config/models`。
+- `PX4_ARUCO_HOME`：运行时临时 HOME，默认 `/tmp/px4_aruco_home`。
+- `ROS_DISTRO`：默认 `noetic`。
+
+本项目主流程已经把外部 workspace 改成可选 source；如果你只运行 `aruco_search_and_land_demo.launch`，主要依赖在当前 PX4 仓库和 `Tools/sitl_gazebo` 子模块中。若要保留旧版 `maxi_aruco_det_pkg`、`aruco_ros` 或外部模型，建议把当前机器上的 ArUco catkin 工作空间单独推成一个 GitHub 仓库，部署时默认克隆到 `$HOME/ros_gazebo_px4_sim_ws-master`。
+
+外部工作空间新设备部署示例：
+
+```bash
+git clone git@github.com:<你的用户名>/ros_gazebo_px4_sim_ws.git ~/ros_gazebo_px4_sim_ws-master
+cd ~/ros_gazebo_px4_sim_ws-master
+rosdep install --from-paths src --ignore-src -r -y
+catkin build
+```
+
+如果你保留 `~/catkin_ws` 作为 Gazebo overlay：
+
+```bash
+mkdir -p ~/catkin_ws/src
+cd ~/catkin_ws
+rosdep install --from-paths src --ignore-src -r -y
+catkin build
+```
+
+## 4. 个人 GitHub 上传流程
+
+建议至少维护两个仓库：
+
+- `PX4-Visual-Landing`：当前 `PX4_Firmware` 仓库。
+- `PX4-SITL_gazebo-Visual-Landing`：`Tools/sitl_gazebo` 子模块 fork，因为 ArUco 世界和模型在子模块内。
+
+可选第三个仓库：
+
+- `ros_gazebo_px4_sim_ws`：外部 catkin 工作空间，保留 `src/` 和 README，不提交 `build/`、`devel/`。
+
+### 4.1 推送 Gazebo 子模块
+
+先在 GitHub 创建 `PX4-SITL_gazebo-Visual-Landing`。然后：
+
+```bash
+cd ~/PX4_Firmware/Tools/sitl_gazebo
+git checkout -b visual-landing-gazebo
+git remote rename origin upstream
+git remote add origin git@github.com:<你的用户名>/PX4-SITL_gazebo-Visual-Landing.git
+git add models/aruco_marker models/aruco_marker_6x6_1000_31_plane models/aruco_nested_board models/iris_down_monocular_cam models/monocular_camera worlds/aruco_landing_demo.world worlds/aruco_search_demo.world worlds/aruco_single_marker_demo.world worlds/empty_aruco.world models/iris_fpv_cam/iris_fpv_cam.sdf
+git commit -m "Add ArUco landing Gazebo worlds and models"
+git push -u origin visual-landing-gazebo
+```
+
+如果还需要 `models/kinect_self`、`worlds/typhoon_h480.world` 或其他已修改模型，也在子模块里一并 `git add`。
+
+### 4.2 更新 PX4 主仓库的子模块地址
+
+```bash
+cd ~/PX4_Firmware
+git config -f .gitmodules submodule.Tools/sitl_gazebo.url git@github.com:<你的用户名>/PX4-SITL_gazebo-Visual-Landing.git
+git config -f .gitmodules submodule.Tools/sitl_gazebo.branch visual-landing-gazebo
+git submodule sync Tools/sitl_gazebo
+git add .gitmodules Tools/sitl_gazebo
+```
+
+### 4.3 推送 PX4 主仓库
+
+在 GitHub 创建 `PX4-Visual-Landing`。然后：
+
+```bash
+cd ~/PX4_Firmware
+git checkout -b visual-landing
+git remote rename origin upstream
+git remote add origin git@github.com:<你的用户名>/PX4-Visual-Landing.git
+git add .gitignore docs/visual_landing_deployment.md config launch scripts ROMFS/px4fmu_common/init.d-posix/rcS ROMFS/px4fmu_common/init.d-posix/px4-rc.mavlink .gitmodules Tools/sitl_gazebo
+git status
+git commit -m "Add ArUco visual landing SITL workflow"
+git push -u origin visual-landing
+```
+
+不要提交这些运行产物：
+
+- `build/`
+- `devel/`
+- `.catkin_tools/`
+- `generated/`
+- `logs/`
+- `scripts/__pycache__/`
+
+### 4.4 推送外部 ArUco 工作空间
+
+```bash
+cd ~/ros_gazebo_px4_sim_ws-master
+git init
+git remote add origin git@github.com:<你的用户名>/ros_gazebo_px4_sim_ws.git
+printf "/build/\n/devel/\n/.catkin_tools/\n*.pyc\n__pycache__/\n" > .gitignore
+git add README.md src .gitignore
+git commit -m "Add ArUco ROS workspace for PX4 landing demo"
+git push -u origin main
+```
+
+## 5. 新设备快速部署
+
+### 5.1 克隆主仓库和子模块
+
+```bash
+git clone --recursive git@github.com:<你的用户名>/PX4-Visual-Landing.git ~/PX4_Firmware
+cd ~/PX4_Firmware
+git checkout visual-landing
+git submodule update --init --recursive
+```
+
+### 5.2 安装依赖并构建
+
+```bash
+cd ~/PX4_Firmware
+bash Tools/setup/ubuntu.sh --no-nuttx
+python3 -m pip install --user -r Tools/setup/requirements.txt
+DONT_RUN=1 make px4_sitl_default gazebo
+```
+
+如果你有外部 ArUco 工作空间：
+
+```bash
+git clone git@github.com:<你的用户名>/ros_gazebo_px4_sim_ws.git ~/ros_gazebo_px4_sim_ws-master
+cd ~/ros_gazebo_px4_sim_ws-master
+rosdep install --from-paths src --ignore-src -r -y
+catkin build
+```
+
+### 5.3 启动视觉降落
+
+```bash
+cd ~/PX4_Firmware
+source scripts/setup_aruco_runtime.bash
+roslaunch px4 aruco_search_and_land_demo.launch gui:=false
+```
+
+如果你的外部工作空间路径不是默认值：
+
+```bash
+export ARUCO_WS=$HOME/workspaces/ros_gazebo_px4_sim_ws
+export GAZEBO_WS=$HOME/catkin_ws
+source scripts/setup_aruco_runtime.bash
+roslaunch px4 aruco_search_and_land_demo.launch gui:=false
+```
+
+## 6. 验证命令
+
+确认 ROS 能找到包：
+
+```bash
+source ~/PX4_Firmware/scripts/setup_aruco_runtime.bash
+rospack find px4
+rospack find mavros
+```
+
+确认 MAVROS 连接：
+
+```bash
+rostopic echo -n 1 /mavros/state
+```
+
+确认图像和检测：
+
+```bash
+rostopic list | grep -E "camera|aruco|mavros/state|local_position"
+rostopic hz /aruco/pose -w 5
+```
+
+跑一次 benchmark：
+
+```bash
+cd ~/PX4_Firmware
+source scripts/setup_aruco_runtime.bash
+python3 scripts/benchmark_aruco_landing.py --runs 1 --timeout 140
+```
+
+清理残留进程：
+
+```bash
+scripts/cleanup_aruco_runtime.sh
+```
+
+## 7. 常见问题
+
+`cv2.aruco` 不存在：安装 `libopencv-contrib-dev` 和 `python3-opencv`，并确认没有被 pip 里不带 contrib 的 `opencv-python` 覆盖。
+
+`rospack find px4` 失败：先 `source scripts/setup_aruco_runtime.bash`，确认脚本没有报 `/opt/ros/noetic/setup.bash` 缺失。
+
+Gazebo 找不到模型或世界：确认 `Tools/sitl_gazebo` 子模块已经指向你个人 fork 的提交，并执行过 `git submodule update --init --recursive`。
+
+OFFBOARD/ARM 失败：确认 `/mavros/state` connected 为 `True`，当前 launch 里 MAVROS 已设置 `use_comp_id_system_control: true`，控制节点也会尝试设置 `COM_RCL_EXCEPT` 以允许无遥控 OFFBOARD。

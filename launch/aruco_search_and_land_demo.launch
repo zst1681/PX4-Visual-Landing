@@ -1,0 +1,53 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="x" default="-1.5"/>
+    <arg name="y" default="-1.5"/>
+    <arg name="z" default="0"/>
+    <arg name="gui" default="false"/>
+    <arg name="interactive" default="false"/>
+    <arg name="verbose" default="true"/>
+    <arg name="dictionary_id" default="11"/>
+    <arg name="aruco_id" default="31"/>
+    <arg name="aruco_length" default="1.0"/>
+    <arg name="takeoff_altitude" default="1.0"/>
+    <arg name="search_spacing" default="0.5"/>
+    <arg name="search_radius" default="1.5"/>
+    <arg name="auto_arm_offboard" default="true"/>
+    <arg name="land_descent_rate" default="0.15"/>
+    <arg name="landing_commit_altitude" default="0.45"/>
+    <arg name="auto_land_settle_time" default="1.0"/>
+    <arg name="marker_estimate_window" default="0.8"/>
+    <arg name="marker_estimate_alpha" default="0.65"/>
+    <arg name="land_z_pid_kp" default="1.05"/>
+    <arg name="land_z_pid_ki" default="0.06"/>
+    <arg name="land_z_pid_kd" default="0.18"/>
+
+    <include file="$(find px4)/launch/mavros_posix_sitl_aruco_project.launch">
+        <arg name="x" value="$(arg x)"/>
+        <arg name="y" value="$(arg y)"/>
+        <arg name="z" value="$(arg z)"/>
+        <arg name="gui" value="$(arg gui)"/>
+        <arg name="interactive" value="$(arg interactive)"/>
+        <arg name="verbose" value="$(arg verbose)"/>
+        <arg name="world" value="$(find mavlink_sitl_gazebo)/worlds/aruco_search_demo.world"/>
+    </include>
+
+    <include file="$(find px4)/launch/aruco_detect_and_search.launch">
+        <arg name="dictionary_id" value="$(arg dictionary_id)"/>
+        <arg name="aruco_id" value="$(arg aruco_id)"/>
+        <arg name="aruco_length" value="$(arg aruco_length)"/>
+        <arg name="auto_arm_offboard" value="$(arg auto_arm_offboard)"/>
+        <arg name="land_after_detect" value="true"/>
+        <arg name="takeoff_altitude" value="$(arg takeoff_altitude)"/>
+        <arg name="search_spacing" value="$(arg search_spacing)"/>
+        <arg name="search_radius" value="$(arg search_radius)"/>
+        <arg name="land_descent_rate" value="$(arg land_descent_rate)"/>
+        <arg name="landing_commit_altitude" value="$(arg landing_commit_altitude)"/>
+        <arg name="auto_land_settle_time" value="$(arg auto_land_settle_time)"/>
+        <arg name="marker_estimate_window" value="$(arg marker_estimate_window)"/>
+        <arg name="marker_estimate_alpha" value="$(arg marker_estimate_alpha)"/>
+        <arg name="land_z_pid_kp" value="$(arg land_z_pid_kp)"/>
+        <arg name="land_z_pid_ki" value="$(arg land_z_pid_ki)"/>
+        <arg name="land_z_pid_kd" value="$(arg land_z_pid_kd)"/>
+    </include>
+</launch>

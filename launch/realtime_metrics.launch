@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<launch>
+    <node name="realtime_error_metrics" pkg="px4" type="realtime_error_metrics.py" output="screen">
+        <param name="local_topic" value="/mavros/local_position/pose"/>
+        <param name="setpoint_topic" value="/mavros/setpoint_position/local"/>
+    </node>
+</launch>

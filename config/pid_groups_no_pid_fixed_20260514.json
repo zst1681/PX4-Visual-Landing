@@ -1,0 +1,18 @@
+{
+  "output_root": "generated/no_pid_fixed_response_20260514",
+  "controller": "aruco_search_and_detect.py",
+  "detector_type": "aruco_multi_marker_det.py",
+  "marker_config": "$(find px4)/config/aruco_nested_board.yaml",
+  "world": "$(find mavlink_sitl_gazebo)/worlds/aruco_search_demo.world",
+  "runs": 1,
+  "timeout": 140.0,
+  "target_x": 1.5,
+  "target_y": 1.5,
+  "groups": [
+    {
+      "label": "no_pid",
+      "controller": "aruco_search_and_detect_no_pid.py",
+      "launch_args": {}
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+marker_configs:
+  - id: 31
+    length: 0.30
+    offset_x: 0.28
+    offset_y: 0.28
+    priority: 1
+    role: corner
+  - id: 32
+    length: 0.30
+    offset_x: -0.28
+    offset_y: 0.28
+    priority: 1
+    role: corner
+  - id: 33
+    length: 0.30
+    offset_x: -0.28
+    offset_y: -0.28
+    priority: 1
+    role: corner
+  - id: 34
+    length: 0.30
+    offset_x: 0.28
+    offset_y: -0.28
+    priority: 1
+    role: corner
+  - id: 35
+    length: 0.20
+    offset_x: 0.0
+    offset_y: 0.0
+    priority: 0
+    role: center

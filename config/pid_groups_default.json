@@ -1,0 +1,55 @@
+{
+  "output_root": "/tmp/aruco_pid_groups",
+  "controller": "aruco_search_and_detect.py",
+  "detector_type": "aruco_multi_marker_det.py",
+  "marker_config": "$(find px4)/config/aruco_nested_board.yaml",
+  "world": "$(find mavlink_sitl_gazebo)/worlds/aruco_search_demo.world",
+  "runs": 1,
+  "timeout": 140.0,
+  "target_x": 1.5,
+  "target_y": 1.5,
+  "groups": [
+    {
+      "label": "conservative",
+      "launch_args": {
+        "track_pid_kp": 0.56,
+        "track_pid_ki": 0.0,
+        "track_pid_kd": 0.12,
+        "land_pid_kp": 0.46,
+        "land_pid_ki": 0.01,
+        "land_pid_kd": 0.10,
+        "land_z_pid_kp": 0.88,
+        "land_z_pid_ki": 0.04,
+        "land_z_pid_kd": 0.12
+      }
+    },
+    {
+      "label": "baseline",
+      "launch_args": {
+        "track_pid_kp": 0.72,
+        "track_pid_ki": 0.0,
+        "track_pid_kd": 0.18,
+        "land_pid_kp": 0.58,
+        "land_pid_ki": 0.02,
+        "land_pid_kd": 0.16,
+        "land_z_pid_kp": 1.05,
+        "land_z_pid_ki": 0.06,
+        "land_z_pid_kd": 0.18
+      }
+    },
+    {
+      "label": "aggressive",
+      "launch_args": {
+        "track_pid_kp": 0.88,
+        "track_pid_ki": 0.0,
+        "track_pid_kd": 0.24,
+        "land_pid_kp": 0.70,
+        "land_pid_ki": 0.03,
+        "land_pid_kd": 0.22,
+        "land_z_pid_kp": 1.22,
+        "land_z_pid_ki": 0.08,
+        "land_z_pid_kd": 0.24
+      }
+    }
+  ]
+}

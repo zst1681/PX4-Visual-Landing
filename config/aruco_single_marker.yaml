@@ -1,0 +1,7 @@
+marker_configs:
+  - id: 31
+    length: 1.0
+    offset_x: 0.0
+    offset_y: 0.0
+    priority: 0
+    role: center
