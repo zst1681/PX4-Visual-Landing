@@ -8,6 +8,8 @@
 
 注意：GitHub 仓库根目录就是本机 `PX4_Firmware` 目录里的所有子文件和子目录，不会再包含一层 `PX4_Firmware/` 文件夹。本文后续用 `PX4_DIR` 表示“本机 PX4 仓库根目录”。推荐本机路径使用 `$HOME/PX4_Firmware`，仓库 URL 使用 `PX4-Visual-Landing.git`：这里本地目录是下划线 `_`，GitHub 仓库名是短横线 `-`。
 
+普通使用者部署项目时建议使用 HTTPS 克隆，不需要配置你的 GitHub 账号或 SSH key。只有你自己维护、提交、推送项目时才需要使用 SSH 地址。
+
 - `launch/aruco_search_and_land_demo.launch`：一键启动 Gazebo、PX4 SITL、MAVROS、ArUco 检测和搜索降落控制。
 - `launch/aruco_detect_and_search.launch`：启动检测节点和降落控制节点。
 - `launch/mavros_posix_sitl_aruco_project.launch`：启动 PX4 SITL、Gazebo 和 MAVROS。
@@ -116,7 +118,7 @@ python3 -m pip install --user -r Tools/setup/requirements.txt
 外部工作空间新设备部署示例：
 
 ```bash
-git clone git@github.com:zst1681/ros_gazebo_px4_sim_ws.git ~/ros_gazebo_px4_sim_ws-master
+git clone https://github.com/zst1681/ros_gazebo_px4_sim_ws.git ~/ros_gazebo_px4_sim_ws-master
 cd ~/ros_gazebo_px4_sim_ws-master
 rosdep install --from-paths src --ignore-src -r -y
 catkin build
@@ -132,6 +134,8 @@ catkin build
 ```
 
 ## 4. 个人 GitHub 上传流程
+
+本章只给项目维护者使用，用于把本机修改推送到你的 GitHub 仓库。别人只想下载和运行项目时，不需要配置你的 GitHub 账号，也不需要执行本章 SSH 和 `git push` 命令，直接从第 5 章开始即可。
 
 下面按你的 GitHub 信息直接写：
 
@@ -191,6 +195,8 @@ ssh -T git@github.com
 
 新建仓库时不要勾选 `Add a README file`、`.gitignore`、`license`，保持空仓库，方便直接推送本地已有项目。
 
+如果希望其他人不用你的账号也能部署项目，请把这些仓库设置为 `Public`。如果仓库必须保持私有，则需要在 GitHub 仓库的 `Settings -> Collaborators` 中把对方加入协作者，否则对方无法克隆主仓库或子模块。
+
 建议至少维护两个仓库：
 
 - `PX4-Visual-Landing`：当前 PX4 项目仓库，仓库根目录直接是 PX4 文件树。
@@ -226,7 +232,7 @@ git push -u origin visual-landing-gazebo
 
 ```bash
 cd "$PX4_DIR"
-git config -f .gitmodules submodule.Tools/sitl_gazebo.url git@github.com:zst1681/PX4-SITL_gazebo-Visual-Landing.git
+git config -f .gitmodules submodule.Tools/sitl_gazebo.url https://github.com/zst1681/PX4-SITL_gazebo-Visual-Landing.git
 git config -f .gitmodules submodule.Tools/sitl_gazebo.branch visual-landing-gazebo
 git submodule sync Tools/sitl_gazebo
 git add .gitmodules Tools/sitl_gazebo
@@ -271,13 +277,15 @@ git push -u origin main
 
 ## 5. 新设备快速部署
 
+本章是普通使用者和新设备部署流程，全部使用 HTTPS 地址，正常情况下不需要配置 SSH key，也不需要登录你的 GitHub 账号。
+
 ### 5.1 克隆主仓库和子模块
 
 ```bash
 export PX4_DIR=$HOME/PX4_Firmware
 # 仅当上一次克隆中断并留下了不完整目录时，先手动执行下面这一行：
 # mv "$PX4_DIR" "${PX4_DIR}.failed.$(date +%Y%m%d%H%M%S)"
-git clone --branch visual-landing --single-branch --depth 1 --filter=blob:none git@github.com:zst1681/PX4-Visual-Landing.git "$PX4_DIR"
+git clone --branch visual-landing --single-branch --depth 1 --filter=blob:none https://github.com/zst1681/PX4-Visual-Landing.git "$PX4_DIR"
 cd "$PX4_DIR"
 git submodule sync --recursive
 git submodule update --init --recursive --depth 1 --jobs 1 \
@@ -287,7 +295,7 @@ git submodule update --init --recursive --depth 1 --jobs 1 \
   src/lib/events/libevents
 ```
 
-不要再用 `git clone --recursive git@github.com:zst1681/PX4-Visual-Landing.git ~/PX4_Firmware` 作为首选方式，也不要直接执行不带路径限制的 `git submodule update --init --recursive`。PX4 历史和子模块都很大，一次性全量递归克隆会拉取 jMAVSim、FlightGear、JSBSim、NuttX 等当前视觉降落流程不需要的内容，网络不稳定时容易出现 `远端意外挂断`、`过早的文件结束符 EOF`、`index-pack 失败`。上面的命令只拉 Gazebo 视觉降落必需的子模块：
+不要再用 `git clone --recursive https://github.com/zst1681/PX4-Visual-Landing.git ~/PX4_Firmware` 作为首选方式，也不要直接执行不带路径限制的 `git submodule update --init --recursive`。PX4 历史和子模块都很大，一次性全量递归克隆会拉取 jMAVSim、FlightGear、JSBSim、NuttX 等当前视觉降落流程不需要的内容，网络不稳定时容易出现 `远端意外挂断`、`过早的文件结束符 EOF`、`index-pack 失败`。上面的命令只拉 Gazebo 视觉降落必需的子模块：
 
 - `Tools/sitl_gazebo`：Gazebo 世界、模型和插件。
 - `src/modules/mavlink/mavlink`：PX4 MAVLink 生成和运行依赖。
@@ -307,7 +315,7 @@ DONT_RUN=1 make px4_sitl_default gazebo
 如果你有外部 ArUco 工作空间：
 
 ```bash
-git clone git@github.com:zst1681/ros_gazebo_px4_sim_ws.git ~/ros_gazebo_px4_sim_ws-master
+git clone https://github.com/zst1681/ros_gazebo_px4_sim_ws.git ~/ros_gazebo_px4_sim_ws-master
 cd ~/ros_gazebo_px4_sim_ws-master
 rosdep install --from-paths src --ignore-src -r -y
 catkin build
@@ -375,7 +383,13 @@ scripts/cleanup_aruco_runtime.sh
 
 `rospack find px4` 失败：先 `source scripts/setup_aruco_runtime.bash`，确认脚本没有报 `/opt/ros/noetic/setup.bash` 缺失。
 
-`git clone` 出现 `远端意外挂断`、`过早的文件结束符（EOF）`、`index-pack 失败`：不要使用全量递归克隆。先把失败留下的不完整目录挪走，再执行 5.1 中的浅克隆命令。仓库 URL 是 `git@github.com:zst1681/PX4-Visual-Landing.git`，本地目录是 `$HOME/PX4_Firmware`，注意 `PX4-Visual-Landing` 用短横线，`PX4_Firmware` 用下划线。
+`git clone` 出现 `远端意外挂断`、`过早的文件结束符（EOF）`、`index-pack 失败`：不要使用全量递归克隆。先把失败留下的不完整目录挪走，再执行 5.1 中的浅克隆命令。普通使用者仓库 URL 是 `https://github.com/zst1681/PX4-Visual-Landing.git`，本地目录是 `$HOME/PX4_Firmware`，注意 `PX4-Visual-Landing` 用短横线，`PX4_Firmware` 用下划线。
+
+别人无法克隆或子模块提示 `Permission denied (publickey)`：说明用了 SSH 地址或仓库不是公开的。普通使用者应使用 HTTPS 地址，并且以下三个 GitHub 仓库需要设为 Public，或把使用者加入 collaborator：
+
+- `zst1681/PX4-Visual-Landing`
+- `zst1681/PX4-SITL_gazebo-Visual-Landing`
+- `zst1681/ros_gazebo_px4_sim_ws`
 
 子模块下载中断：进入 `$PX4_DIR` 后重复执行下面这条命令即可，它会从已有进度继续补齐必需子模块：
 
