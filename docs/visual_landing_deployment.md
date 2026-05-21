@@ -6,7 +6,7 @@
 
 核心仓库是 `PX4-Visual-Landing`，在原 PX4 基础上增加了以下视觉降落相关内容。
 
-注意：GitHub 仓库根目录就是本机 `PX4_Firmware` 目录里的所有子文件和子目录，不会再包含一层 `PX4_Firmware/` 文件夹。本文后续用 `PX4_DIR` 表示“本机 PX4 仓库根目录”；新设备推荐克隆到 `$HOME/PX4-Visual-Landing`，当前机器如果仍使用旧目录名，也可以把 `PX4_DIR` 设为 `$HOME/PX4_Firmware`。
+注意：GitHub 仓库根目录就是本机 `PX4_Firmware` 目录里的所有子文件和子目录，不会再包含一层 `PX4_Firmware/` 文件夹。本文后续用 `PX4_DIR` 表示“本机 PX4 仓库根目录”。推荐本机路径使用 `$HOME/PX4_Firmware`，仓库 URL 使用 `PX4-Visual-Landing.git`：这里本地目录是下划线 `_`，GitHub 仓库名是短横线 `-`。
 
 - `launch/aruco_search_and_land_demo.launch`：一键启动 Gazebo、PX4 SITL、MAVROS、ArUco 检测和搜索降落控制。
 - `launch/aruco_detect_and_search.launch`：启动检测节点和降落控制节点。
@@ -38,7 +38,7 @@ sudo apt install -y git curl wget gnupg lsb-release build-essential cmake ninja-
 PX4 依赖由仓库自带脚本安装。只做仿真可跳过 NuttX 交叉编译工具链：
 
 ```bash
-export PX4_DIR=$HOME/PX4-Visual-Landing
+export PX4_DIR=$HOME/PX4_Firmware
 cd "$PX4_DIR"
 bash Tools/setup/ubuntu.sh --no-nuttx
 ```
@@ -95,7 +95,7 @@ python3 -c "import cv2; print(cv2.__version__); print(hasattr(cv2, 'aruco'))"
 Python 依赖：
 
 ```bash
-export PX4_DIR=$HOME/PX4-Visual-Landing
+export PX4_DIR=$HOME/PX4_Firmware
 cd "$PX4_DIR"
 python3 -m pip install --user -r Tools/setup/requirements.txt
 ```
@@ -274,17 +274,21 @@ git push -u origin main
 ### 5.1 克隆主仓库和子模块
 
 ```bash
-export PX4_DIR=$HOME/PX4-Visual-Landing
-git clone --recursive git@github.com:zst1681/PX4-Visual-Landing.git "$PX4_DIR"
+export PX4_DIR=$HOME/PX4_Firmware
+# 仅当上一次克隆中断并留下了不完整目录时，先手动执行下面这一行：
+# mv "$PX4_DIR" "${PX4_DIR}.failed.$(date +%Y%m%d%H%M%S)"
+git clone --branch visual-landing --single-branch --depth 1 --filter=blob:none git@github.com:zst1681/PX4-Visual-Landing.git "$PX4_DIR"
 cd "$PX4_DIR"
-git checkout visual-landing
-git submodule update --init --recursive
+git submodule sync --recursive
+git submodule update --init --recursive --depth 1 --jobs 1
 ```
+
+不要再用 `git clone --recursive git@github.com:zst1681/PX4-Visual-Landing.git ~/PX4_Firmware` 作为首选方式。PX4 历史和子模块都很大，一次性全量递归克隆容易出现 `远端意外挂断`、`过早的文件结束符 EOF`、`index-pack 失败`。上面的命令先浅克隆主仓库，再用单线程分步拉子模块，更适合网络不稳定的新设备。
 
 ### 5.2 安装依赖并构建
 
 ```bash
-export PX4_DIR=$HOME/PX4-Visual-Landing
+export PX4_DIR=$HOME/PX4_Firmware
 cd "$PX4_DIR"
 bash Tools/setup/ubuntu.sh --no-nuttx
 python3 -m pip install --user -r Tools/setup/requirements.txt
@@ -303,7 +307,7 @@ catkin build
 ### 5.3 启动视觉降落
 
 ```bash
-export PX4_DIR=$HOME/PX4-Visual-Landing
+export PX4_DIR=$HOME/PX4_Firmware
 cd "$PX4_DIR"
 source scripts/setup_aruco_runtime.bash
 roslaunch px4 aruco_search_and_land_demo.launch gui:=false
@@ -362,6 +366,16 @@ scripts/cleanup_aruco_runtime.sh
 
 `rospack find px4` 失败：先 `source scripts/setup_aruco_runtime.bash`，确认脚本没有报 `/opt/ros/noetic/setup.bash` 缺失。
 
-Gazebo 找不到模型或世界：确认 `Tools/sitl_gazebo` 子模块已经指向你个人 fork 的提交，并执行过 `git submodule update --init --recursive`。
+`git clone` 出现 `远端意外挂断`、`过早的文件结束符（EOF）`、`index-pack 失败`：不要使用全量递归克隆。先把失败留下的不完整目录挪走，再执行 5.1 中的浅克隆命令。仓库 URL 是 `git@github.com:zst1681/PX4-Visual-Landing.git`，本地目录是 `$HOME/PX4_Firmware`，注意 `PX4-Visual-Landing` 用短横线，`PX4_Firmware` 用下划线。
+
+子模块下载中断：进入 `$PX4_DIR` 后重复执行下面这条命令即可，它会从已有进度继续补齐：
+
+```bash
+git submodule update --init --recursive --depth 1 --jobs 1
+```
+
+如果提示 `--filter=blob:none` 不支持：说明新设备的 Git 版本太旧，先执行 `git --version` 检查；Ubuntu 20.04 默认 Git 通常可用。临时绕过时可以去掉 `--filter=blob:none`，但下载体积会变大。
+
+Gazebo 找不到模型或世界：确认 `Tools/sitl_gazebo` 子模块已经指向你个人 fork 的提交，并执行过 `git submodule update --init --recursive --depth 1 --jobs 1`。
 
 OFFBOARD/ARM 失败：确认 `/mavros/state` connected 为 `True`，当前 launch 里 MAVROS 已设置 `use_comp_id_system_control: true`，控制节点也会尝试设置 `COM_RCL_EXCEPT` 以允许无遥控 OFFBOARD。
