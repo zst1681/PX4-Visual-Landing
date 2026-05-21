@@ -8,6 +8,7 @@
     <arg name="verbose" default="true"/>
     <arg name="world" default="$(find mavlink_sitl_gazebo)/worlds/aruco_search_demo.world"/>
     <arg name="marker_config_path" default="$(find px4)/config/aruco_nested_board.yaml"/>
+    <arg name="sub_image_topic" default="/camera/image_raw"/>
     <arg name="detector_type" default="aruco_multi_marker_det.py"/>
     <arg name="dictionary_id" default="11"/>
     <arg name="aruco_id" default="31"/>
@@ -48,7 +49,7 @@
         <param name="aruco_id" value="$(arg aruco_id)"/>
         <param name="aruco_length" value="$(arg aruco_length)"/>
         <param name="camera_param_path" value="$(find px4)/config/camera_monocular_1280x720.yaml"/>
-        <param name="sub_image_topic" value="/iris/camera/image_raw"/>
+        <param name="sub_image_topic" value="$(arg sub_image_topic)"/>
         <rosparam command="load" file="$(arg marker_config_path)"/>
     </node>
 

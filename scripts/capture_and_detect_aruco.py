@@ -69,7 +69,7 @@ def detect_markers(frame):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--topic", default="/camera/rgb/image_raw")
+    parser.add_argument("--topic", default="/camera/image_raw")
     parser.add_argument("--timeout", type=float, default=10.0)
     parser.add_argument("--output", default="/tmp/aruco_frame.png")
     args = parser.parse_args()

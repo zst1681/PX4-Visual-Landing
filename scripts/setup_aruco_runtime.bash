@@ -6,11 +6,12 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   exit 1
 fi
 
+PX4_REAL_HOME="${PX4_ARUCO_USER_HOME:-${HOME}}"
 PX4_DIR="${PX4_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 ROS_DISTRO="${ROS_DISTRO:-noetic}"
-GAZEBO_WS="${GAZEBO_WS:-${CATKIN_WS:-${HOME}/catkin_ws}}"
-ARUCO_WS="${ARUCO_WS:-${HOME}/ros_gazebo_px4_sim_ws-master}"
-XTDRONE_MODELS="${XTDRONE_MODELS:-${HOME}/XTDrone/sitl_config/models}"
+GAZEBO_WS="${GAZEBO_WS:-${CATKIN_WS:-${PX4_REAL_HOME}/catkin_ws}}"
+ARUCO_WS="${ARUCO_WS:-${PX4_REAL_HOME}/ros_gazebo_px4_sim_ws-master}"
+XTDRONE_MODELS="${XTDRONE_MODELS:-${PX4_REAL_HOME}/XTDrone/sitl_config/models}"
 TMP_HOME="${PX4_ARUCO_HOME:-/tmp/px4_aruco_home}"
 
 source_required() {
@@ -38,8 +39,11 @@ source_optional() {
 
 mkdir -p "${TMP_HOME}/.ros" "${TMP_HOME}/.gazebo"
 
-export HOME="${TMP_HOME}"
 export ROS_HOME="${TMP_HOME}/.ros"
+
+if [[ "${PX4_ARUCO_USE_TMP_HOME:-0}" == "1" ]]; then
+  export HOME="${TMP_HOME}"
+fi
 
 source_required "/opt/ros/${ROS_DISTRO}/setup.bash" || return 1
 source_optional "${GAZEBO_WS}/devel/setup.bash" "Gazebo catkin workspace"

@@ -69,7 +69,7 @@ class ArucoWeightedMultiMarkerDetector:
             "~camera_param_path",
             str(PX4_ROOT / "config" / "camera_monocular_1280x720.yaml"),
         )
-        self.sub_image_topic = rospy.get_param("~sub_image_topic", "/iris/camera/image_raw")
+        self.sub_image_topic = rospy.get_param("~sub_image_topic", "/camera/image_raw")
         self.default_frame_id = rospy.get_param("~default_frame_id", "camera_link")
         self.debug_axis_length = rospy.get_param("~debug_axis_length", 0.1)
         self.publish_debug_image = rospy.get_param("~publish_debug_image", True)

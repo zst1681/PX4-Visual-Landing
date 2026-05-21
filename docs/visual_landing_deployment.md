@@ -99,7 +99,22 @@ Python 依赖：
 ```bash
 export PX4_DIR=$HOME/PX4_Firmware
 cd "$PX4_DIR"
-python3 -m pip install --user -r Tools/setup/requirements.txt
+python3 -m pip cache purge || true
+python3 -m pip install --user --upgrade pip setuptools wheel
+python3 -m pip install --user --no-cache-dir -r Tools/setup/requirements.txt
+python3 - <<'PY'
+import kconfiglib
+import menuconfig
+print("PX4 Python deps ok")
+PY
+```
+
+如果 `pip` 报 `THESE PACKAGES DO NOT MATCH THE HASHES`，通常不是 `requirements.txt` 写错，而是 wheel 下载中断或 pip 缓存里有损坏文件。先执行上面的 `pip cache purge` 和 `--no-cache-dir` 版本；网络仍不稳定时可临时换镜像：
+
+```bash
+python3 -m pip install --user --no-cache-dir \
+  -i https://pypi.tuna.tsinghua.edu.cn/simple \
+  -r Tools/setup/requirements.txt
 ```
 
 ## 3. 外部 catkin 工作空间
@@ -110,7 +125,8 @@ python3 -m pip install --user -r Tools/setup/requirements.txt
 - `ARUCO_WS`：外部 ArUco 工作空间，默认 `$HOME/ros_gazebo_px4_sim_ws-master`。
 - `GAZEBO_WS` 或 `CATKIN_WS`：可选 Gazebo overlay 工作空间，默认 `$HOME/catkin_ws`。
 - `XTDRONE_MODELS`：可选 XTDrone 模型目录，默认 `$HOME/XTDrone/sitl_config/models`。
-- `PX4_ARUCO_HOME`：运行时临时 HOME，默认 `/tmp/px4_aruco_home`。
+- `PX4_ARUCO_HOME`：运行时 ROS 日志临时目录，默认 `/tmp/px4_aruco_home`。
+- `PX4_ARUCO_USE_TMP_HOME`：默认 `0`，不会改当前 shell 的 `HOME`。只有做隔离测试时才设置为 `1`。
 - `ROS_DISTRO`：默认 `noetic`。
 
 本项目主流程已经把外部 workspace 改成可选 source；如果你只运行 `aruco_search_and_land_demo.launch`，主要依赖在当前 PX4 仓库和 `Tools/sitl_gazebo` 子模块中。若要保留旧版 `maxi_aruco_det_pkg`、`aruco_ros` 或外部模型，建议把当前机器上的 ArUco catkin 工作空间单独推成一个 GitHub 仓库，部署时默认克隆到 `$HOME/ros_gazebo_px4_sim_ws-master`。
@@ -305,10 +321,19 @@ git submodule update --init --recursive --depth 1 --jobs 1 \
 ### 5.2 安装依赖并构建
 
 ```bash
-export PX4_DIR=$HOME/PX4_Firmware
+# 如果当前终端之前 source 过旧版 setup_aruco_runtime.bash，先恢复真实 HOME。
+export HOME="$(getent passwd "$(id -un)" | cut -d: -f6)"
+export PX4_DIR="$HOME/PX4_Firmware"
 cd "$PX4_DIR"
 bash Tools/setup/ubuntu.sh --no-nuttx
-python3 -m pip install --user -r Tools/setup/requirements.txt
+python3 -m pip cache purge || true
+python3 -m pip install --user --upgrade pip setuptools wheel
+python3 -m pip install --user --no-cache-dir -r Tools/setup/requirements.txt
+python3 - <<'PY'
+import kconfiglib
+import menuconfig
+print("PX4 Python deps ok")
+PY
 DONT_RUN=1 make px4_sitl_default gazebo
 ```
 
@@ -324,20 +349,71 @@ catkin build
 ### 5.3 启动视觉降落
 
 ```bash
-export PX4_DIR=$HOME/PX4_Firmware
+export PX4_DIR="$HOME/PX4_Firmware"
 cd "$PX4_DIR"
 source scripts/setup_aruco_runtime.bash
-roslaunch px4 aruco_search_and_land_demo.launch gui:=false
 ```
 
-如果你的外部工作空间路径不是默认值：
+下面四组命令都使用同一个总控 launch：`aruco_search_and_land_benchmark.launch`。它可以同时指定 Gazebo world、marker 配置、检测器和控制器，适合对比单码/嵌套码、有 PID/无 PID。
+
+单码，有 PID：
+
+```bash
+roslaunch px4 aruco_search_and_land_benchmark.launch gui:=false \
+  world:='$(find mavlink_sitl_gazebo)/worlds/aruco_single_marker_demo.world' \
+  marker_config_path:='$(find px4)/config/aruco_single_marker.yaml' \
+  detector_type:=aruco_multi_marker_det.py \
+  controller_type:=aruco_search_and_detect.py \
+  aruco_id:=31 aruco_length:=1.0
+```
+
+单码，无 PID：
+
+```bash
+roslaunch px4 aruco_search_and_land_benchmark.launch gui:=false \
+  world:='$(find mavlink_sitl_gazebo)/worlds/aruco_single_marker_demo.world' \
+  marker_config_path:='$(find px4)/config/aruco_single_marker.yaml' \
+  detector_type:=aruco_multi_marker_det.py \
+  controller_type:=aruco_search_and_detect_no_pid.py \
+  aruco_id:=31 aruco_length:=1.0
+```
+
+嵌套码，有 PID：
+
+```bash
+roslaunch px4 aruco_search_and_land_benchmark.launch gui:=false \
+  world:='$(find mavlink_sitl_gazebo)/worlds/aruco_search_demo.world' \
+  marker_config_path:='$(find px4)/config/aruco_nested_board_weighted.yaml' \
+  detector_type:=aruco_multi_marker_det_weighted.py \
+  controller_type:=aruco_search_and_detect.py \
+  aruco_id:=31 aruco_length:=0.30
+```
+
+嵌套码，无 PID：
+
+```bash
+roslaunch px4 aruco_search_and_land_benchmark.launch gui:=false \
+  world:='$(find mavlink_sitl_gazebo)/worlds/aruco_search_demo.world' \
+  marker_config_path:='$(find px4)/config/aruco_nested_board_weighted.yaml' \
+  detector_type:=aruco_multi_marker_det_weighted.py \
+  controller_type:=aruco_search_and_detect_no_pid.py \
+  aruco_id:=31 aruco_length:=0.30
+```
+
+如果要使用非加权嵌套检测器，把嵌套码命令中的两项替换为：
+
+```bash
+marker_config_path:='$(find px4)/config/aruco_nested_board.yaml' \
+detector_type:=aruco_multi_marker_det.py
+```
+
+如果你的外部工作空间路径不是默认值，先设置路径再 source：
 
 ```bash
 cd "$PX4_DIR"
 export ARUCO_WS=$HOME/workspaces/ros_gazebo_px4_sim_ws
 export GAZEBO_WS=$HOME/catkin_ws
 source scripts/setup_aruco_runtime.bash
-roslaunch px4 aruco_search_and_land_demo.launch gui:=false
 ```
 
 ## 6. 验证命令
@@ -360,7 +436,37 @@ rostopic echo -n 1 /mavros/state
 
 ```bash
 rostopic list | grep -E "camera|aruco|mavros/state|local_position"
+rostopic hz /camera/image_raw -w 5
 rostopic hz /aruco/pose -w 5
+```
+
+单独抓取一帧图像并检测 ArUco：
+
+```bash
+cd "$PX4_DIR"
+source scripts/setup_aruco_runtime.bash
+python3 scripts/capture_and_detect_aruco.py \
+  --topic /camera/image_raw \
+  --output /tmp/aruco_frame.png
+```
+
+查看原始图像和检测调试图：
+
+```bash
+rqt_image_view /camera/image_raw
+rqt_image_view /aruco_det_image
+```
+
+如果你的设备或模型实际发布的是其他图像话题，先查话题，再把启动命令里的 `sub_image_topic` 改成对应值：
+
+```bash
+rostopic list | grep -E "image_raw|camera_info"
+roslaunch px4 aruco_search_and_land_benchmark.launch gui:=false \
+  sub_image_topic:=/你的/image_raw/话题 \
+  world:='$(find mavlink_sitl_gazebo)/worlds/aruco_search_demo.world' \
+  marker_config_path:='$(find px4)/config/aruco_nested_board_weighted.yaml' \
+  detector_type:=aruco_multi_marker_det_weighted.py \
+  controller_type:=aruco_search_and_detect.py
 ```
 
 跑一次 benchmark：
@@ -381,7 +487,43 @@ scripts/cleanup_aruco_runtime.sh
 
 `cv2.aruco` 不存在：安装 `libopencv-contrib-dev` 和 `python3-opencv`，并确认没有被 pip 里不带 contrib 的 `opencv-python` 覆盖。
 
-`rospack find px4` 失败：先 `source scripts/setup_aruco_runtime.bash`，确认脚本没有报 `/opt/ros/noetic/setup.bash` 缺失。
+`pip install -r Tools/setup/requirements.txt` 报 `THESE PACKAGES DO NOT MATCH THE HASHES`：清掉损坏缓存并关闭缓存重装：
+
+```bash
+python3 -m pip cache purge || true
+python3 -m pip install --user --no-cache-dir -r Tools/setup/requirements.txt
+```
+
+如果仍然失败，换一个稳定镜像再执行：
+
+```bash
+python3 -m pip install --user --no-cache-dir \
+  -i https://pypi.tuna.tsinghua.edu.cn/simple \
+  -r Tools/setup/requirements.txt
+```
+
+`make px4_sitl_default gazebo` 报 `No module named 'menuconfig'` 或 `kconfiglib is not installed`：说明 Python 依赖没有装成功，至少需要先确认下面两项能导入：
+
+```bash
+python3 -m pip install --user --no-cache-dir kconfiglib
+python3 - <<'PY'
+import kconfiglib
+import menuconfig
+print("kconfiglib ok")
+PY
+```
+
+`cd "$PX4_DIR"` 跑到 `/tmp/px4_aruco_home/PX4_Firmware`：这是旧版运行脚本把当前 shell 的 `HOME` 改到了临时目录。重新开一个终端，或手动恢复：
+
+```bash
+export HOME="$(getent passwd "$(id -un)" | cut -d: -f6)"
+export PX4_DIR="$HOME/PX4_Firmware"
+cd "$PX4_DIR"
+```
+
+`rospack find px4` 失败：先完成 `DONT_RUN=1 make px4_sitl_default gazebo`，再 `source scripts/setup_aruco_runtime.bash`，确认脚本没有报 `/opt/ros/noetic/setup.bash` 或 `$PX4_DIR/Tools/setup_gazebo.bash` 缺失。
+
+`/aruco/pose` 没有发布：先确认相机图像存在。当前 `iris_down_monocular_cam` 默认话题是 `/camera/image_raw`，检测调试图是 `/aruco_det_image`。如果 `rostopic list | grep image_raw` 查到的图像话题不同，用 `sub_image_topic:=实际话题` 覆盖启动参数。
 
 `git clone` 出现 `远端意外挂断`、`过早的文件结束符（EOF）`、`index-pack 失败`：不要使用全量递归克隆。先把失败留下的不完整目录挪走，再执行 5.1 中的浅克隆命令。普通使用者仓库 URL 是 `https://github.com/zst1681/PX4-Visual-Landing.git`，本地目录是 `$HOME/PX4_Firmware`，注意 `PX4-Visual-Landing` 用短横线，`PX4_Firmware` 用下划线。
 
